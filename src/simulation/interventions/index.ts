@@ -6,7 +6,7 @@ export const INTERVENTIONS: Record<string, InterventionDefinition> = {
   oxygen: {
     id: 'oxygen',
     name: 'OXYGEN',
-    cooldownSeconds: 15,
+    cooldownSeconds: 12,
     effectDurationTicks: 10,
     eligibleWhen: (v: Vitals) => v.spo2 < 95,
   },
@@ -15,7 +15,7 @@ export const INTERVENTIONS: Record<string, InterventionDefinition> = {
     id: 'iv_fluids',
     name: 'IV FLUIDS',
     cooldownSeconds: 20,
-    effectDurationTicks: 8,
+    effectDurationTicks: 12,
     eligibleWhen: (v: Vitals) => v.sbp < 100,
   },
 
@@ -32,6 +32,6 @@ export const INTERVENTIONS: Record<string, InterventionDefinition> = {
     name: 'CARDIOVERSION',
     cooldownSeconds: 45,
     effectDurationTicks: 1, // instant effect
-    eligibleWhen: (v: Vitals) => v.rhythm === 'tachy' && v.hr > 150,
+    eligibleWhen: (v: Vitals) => v.rhythm === 'tachy' && v.hr > 130,
   },
 };

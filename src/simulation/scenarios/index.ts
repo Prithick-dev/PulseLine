@@ -17,7 +17,7 @@ export const SCENARIOS: Record<string, ScenarioDefinition> = {
     },
     timeLimitSeconds: 90,
     parTimeSeconds: 60,
-    availableInterventions: ['oxygen', 'rate_control', 'cardioversion'],
+    availableInterventions: ['oxygen', 'iv_fluids', 'rate_control', 'cardioversion'],
   },
 
   hypoxemia: {

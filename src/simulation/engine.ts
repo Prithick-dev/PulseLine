@@ -158,9 +158,9 @@ function deteriorateTachyarrhythmia(vitals: Vitals, t: ThresholdCounters): void 
     vitals.rhythm = 'tachy';
   }
 
-  // Secondary perfusion compromise
+  // Secondary perfusion compromise (tuned: -0.5/tick to allow recovery via IV Fluids)
   if (vitals.hr > 140) {
-    vitals.sbp -= 1;
+    vitals.sbp -= 0.5;
   }
 
   // Secondary hypoxia
@@ -196,8 +196,8 @@ function deteriorateHypoxemia(vitals: Vitals, t: ThresholdCounters): void {
 // Spec: SBP -2/tick baseline; compensatory tachycardia; secondary SpO2 drop;
 //       rhythm transition at sustained SBP < 60
 function deteriorateHypotensiveShock(vitals: Vitals, t: ThresholdCounters): void {
-  // Baseline: SBP falls every tick
-  vitals.sbp -= 2;
+  // Baseline: SBP falls every tick (tuned: -1.5 so IV Fluids can outpace the drop)
+  vitals.sbp -= 1.5;
 
   // Compensatory tachycardia
   if (t.sbpBelow80 >= 10) {
@@ -220,15 +220,15 @@ function deteriorateHypotensiveShock(vitals: Vitals, t: ThresholdCounters): void
 function applyActiveInterventions(state: SimulationState): void {
   const {vitals, interventions, scenarioId} = state;
 
-  // Oxygen — SpO2 +2/tick (or +0.5/tick if cardiac-origin in Scenario 3)
+  // Oxygen — SpO2 +2/tick (or +1/tick if cardiac-origin in Scenario 3)
   if (interventions.oxygen.activeTicksRemaining > 0) {
-    const gain = scenarioId === 'hypotensive_shock' ? 0.5 : 2;
+    const gain = scenarioId === 'hypotensive_shock' ? 1 : 2;
     vitals.spo2 += gain;
   }
 
-  // IV Fluids — SBP +3/tick (or +1/tick if HR > 140); overshoot risk handled on apply
+  // IV Fluids — SBP +4/tick (or +1.5/tick if HR > 140); overshoot risk handled on apply
   if (interventions.iv_fluids.activeTicksRemaining > 0) {
-    const gain = vitals.hr > 140 ? 1 : 3;
+    const gain = vitals.hr > 140 ? 1.5 : 4;
     vitals.sbp += gain;
   }
 
