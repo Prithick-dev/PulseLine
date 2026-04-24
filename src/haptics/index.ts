@@ -1,46 +1,45 @@
 // Haptics module — all haptic feedback for PulseLine
+// Uses react-native-haptic-feedback (no Expo dependency)
 // Reads the settings store to respect the haptics toggle.
-// All calls are fire-and-forget (void Promise) — never block the tick loop.
 
-import * as Haptics from 'expo-haptics';
+import {trigger, HapticFeedbackTypes} from 'react-native-haptic-feedback';
 import {useSettingsStore} from '../store/settingsStore';
 
 function isEnabled(): boolean {
   return useSettingsStore.getState().hapticsEnabled;
 }
 
+function fire(type: HapticFeedbackTypes): void {
+  if (!isEnabled()) return;
+  trigger(type);
+}
+
 // Correct intervention applied — satisfying confirmation
 export function hapticCorrectAction(): void {
-  if (!isEnabled()) return;
-  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  fire(HapticFeedbackTypes.notificationSuccess);
 }
 
 // Misapplied or ineligible intervention — sharp rejection
 export function hapticHarmfulAction(): void {
-  if (!isEnabled()) return;
-  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  fire(HapticFeedbackTypes.notificationError);
 }
 
 // Patient stabilized — strong success pulse
 export function hapticStabilized(): void {
-  if (!isEnabled()) return;
-  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  fire(HapticFeedbackTypes.notificationSuccess);
 }
 
 // Deterioration warning — subtle alert on tier drop
 export function hapticDeteriorationWarning(): void {
-  if (!isEnabled()) return;
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  fire(HapticFeedbackTypes.impactMedium);
 }
 
 // Failure — heavy impact
 export function hapticPatientLost(): void {
-  if (!isEnabled()) return;
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+  fire(HapticFeedbackTypes.impactHeavy);
 }
 
-// Heartbeat tick — light pulse in sync with HR (used sparingly)
+// Heartbeat tick — light pulse in sync with HR
 export function hapticHeartbeat(): void {
-  if (!isEnabled()) return;
-  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  fire(HapticFeedbackTypes.impactLight);
 }
