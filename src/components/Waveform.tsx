@@ -1,122 +1,135 @@
-// Waveform — scrolling ECG-style line using React Native Skia + Reanimated
-// The waveform is driven by a rolling buffer of HR-derived sample points.
-// It scrolls continuously left on the UI thread — zero React re-renders.
+// Waveform — real-time scrolling ECG line using react-native-gifted-charts
+// New data points are pushed every frame interval based on current HR.
+// The chart auto-scrolls to the latest point, producing a continuous monitor effect.
 
-import React, {useEffect} from 'react';
-import {StyleSheet} from 'react-native';
-import {Canvas, Path, Skia} from '@shopify/react-native-skia';
-import {
-  useSharedValue,
-  useDerivedValue,
-  withRepeat,
-  withTiming,
-  Easing,
-  runOnUI,
-} from 'react-native-reanimated';
+import React, {useEffect, useRef, useCallback} from 'react';
+import {View, StyleSheet} from 'react-native';
+import {LineChart} from 'react-native-gifted-charts';
 import {Colors} from '../theme/colors';
 
-const CANVAS_HEIGHT = 80;
-const BUFFER_SIZE = 120; // how many samples we keep
-const SCROLL_SPEED_PER_SEC = 60; // px/s — how fast the line scrolls left
+const CANVAS_HEIGHT = 100;
+const MAX_POINTS = 150; // visible window of data points
+const TICK_MS = 50; // push a new sample every 50ms for smooth animation
 
 // Generate one ECG-like cycle as normalised y values (0..1)
-// 0 = top of canvas, 1 = bottom
-function generateEcgCycle(hrNorm: number): number[] {
-  // hrNorm: 0 (low HR, slow) to 1 (high HR, fast)
-  // Returns 30 samples for one beat
+// 0 = baseline, positive = upward deflection
+function generateEcgCycle(): number[] {
   const samples: number[] = [];
-  for (let i = 0; i < 30; i++) {
-    const t = i / 30;
-    // Baseline
-    let y = 0.5;
+  const cycleLen = 60; // samples per heartbeat cycle
+  for (let i = 0; i < cycleLen; i++) {
+    const t = i / cycleLen;
+    let y = 0;
     // P-wave (small bump ~t=0.1)
-    if (t > 0.08 && t < 0.2) y -= 0.08 * Math.sin(((t - 0.08) / 0.12) * Math.PI);
+    if (t > 0.08 && t < 0.2) {
+      y += 0.08 * Math.sin(((t - 0.08) / 0.12) * Math.PI);
+    }
     // QRS complex (sharp spike ~t=0.35)
-    if (t > 0.28 && t < 0.38) y += 0.12 * Math.sin(((t - 0.28) / 0.05) * Math.PI);
-    if (t > 0.33 && t < 0.43) y -= 0.55 * Math.sin(((t - 0.33) / 0.05) * Math.PI);
-    if (t > 0.38 && t < 0.48) y += 0.08 * Math.sin(((t - 0.38) / 0.05) * Math.PI);
+    if (t > 0.28 && t < 0.38) {
+      y -= 0.12 * Math.sin(((t - 0.28) / 0.05) * Math.PI);
+    }
+    if (t > 0.33 && t < 0.43) {
+      y += 0.55 * Math.sin(((t - 0.33) / 0.05) * Math.PI);
+    }
+    if (t > 0.38 && t < 0.48) {
+      y -= 0.08 * Math.sin(((t - 0.38) / 0.05) * Math.PI);
+    }
     // T-wave (slow bump ~t=0.6)
-    if (t > 0.52 && t < 0.75) y -= 0.12 * Math.sin(((t - 0.52) / 0.23) * Math.PI);
-    samples.push(Math.max(0.05, Math.min(0.95, y)));
+    if (t > 0.52 && t < 0.75) {
+      y += 0.12 * Math.sin(((t - 0.52) / 0.23) * Math.PI);
+    }
+    samples.push(y);
   }
   return samples;
 }
 
+// Pre-compute a single ECG cycle
+const ECG_CYCLE = generateEcgCycle();
+
 interface WaveformProps {
-  hr: number;       // current heart rate — drives cycle speed + amplitude
-  width: number;    // container width in px
-  color: string;    // line color
+  hr: number; // current heart rate — drives cycle speed
+  width: number; // container width in px
+  color: string; // line color
 }
 
 export function Waveform({hr, width, color}: WaveformProps) {
-  // Normalised HR: 0 = 40bpm, 1 = 200bpm
-  const hrNorm = Math.max(0, Math.min(1, (hr - 40) / 160));
-
-  // Rolling sample buffer — holds BUFFER_SIZE y-values
-  const buffer = useSharedValue<number[]>(
-    Array.from({length: BUFFER_SIZE}, () => 0.5),
+  const [data, setData] = React.useState<{value: number}[]>(() =>
+    Array.from({length: MAX_POINTS}, () => ({value: 0})),
   );
 
-  // Scroll offset — advances on the UI thread at SCROLL_SPEED_PER_SEC px/s
-  const scrollX = useSharedValue(0);
+  // Use refs to avoid re-creating the interval on every HR change
+  const hrRef = useRef(hr);
+  const cycleIndexRef = useRef(0);
 
   useEffect(() => {
-    scrollX.value = withRepeat(
-      withTiming(BUFFER_SIZE, {
-        duration: (BUFFER_SIZE / SCROLL_SPEED_PER_SEC) * 1000,
-        easing: Easing.linear,
-      }),
-      -1, // infinite
-      false,
-    );
+    hrRef.current = hr;
+  }, [hr]);
+
+  const pushSample = useCallback(() => {
+    // Samples per beat cycle based on HR
+    // At 60 bpm → 1 beat/sec → 20 samples/beat at 50ms intervals
+    // At 120 bpm → 2 beats/sec → 10 samples/beat
+    const currentHr = hrRef.current;
+    const beatsPerSec = Math.max(20, Math.min(250, currentHr)) / 60;
+    const samplesPerBeat = 1000 / TICK_MS / beatsPerSec;
+
+    // Map cycle index to ECG_CYCLE position
+    const cyclePos =
+      (cycleIndexRef.current / samplesPerBeat) * ECG_CYCLE.length;
+    const idx = Math.floor(cyclePos) % ECG_CYCLE.length;
+    const amplitude = ECG_CYCLE[idx] * CANVAS_HEIGHT * 0.4;
+
+    cycleIndexRef.current = (cycleIndexRef.current + 1) % 10000;
+
+    setData(prev => {
+      const next = [...prev, {value: amplitude}];
+      if (next.length > MAX_POINTS) {
+        return next.slice(next.length - MAX_POINTS);
+      }
+      return next;
+    });
   }, []);
 
-  // Inject new ECG samples whenever HR changes
   useEffect(() => {
-    const cycle = generateEcgCycle(hrNorm);
-    runOnUI(() => {
-      'worklet';
-      const current = buffer.value.slice();
-      // Append cycle samples, keeping buffer at BUFFER_SIZE
-      current.push(...cycle);
-      buffer.value = current.slice(-BUFFER_SIZE);
-    })();
-  }, [Math.round(hr / 5)]); // re-inject when HR changes by >=5
+    const interval = setInterval(pushSample, TICK_MS);
+    return () => clearInterval(interval);
+  }, [pushSample]);
 
-  // Build the Skia path on the UI thread using the current buffer + scroll
-  const path = useDerivedValue(() => {
-    'worklet';
-    const pts = buffer.value;
-    const skPath = Skia.Path.Make();
-    const step = width / (pts.length - 1);
-
-    const offsetX = (scrollX.value / BUFFER_SIZE) * width;
-
-    for (let i = 0; i < pts.length; i++) {
-      const x = i * step - offsetX;
-      const y = pts[i] * CANVAS_HEIGHT;
-      if (i === 0) skPath.moveTo(x, y);
-      else skPath.lineTo(x, y);
-    }
-    return skPath;
-  });
+  const spacing = width / MAX_POINTS;
 
   return (
-    <Canvas style={[styles.canvas, {width, height: CANVAS_HEIGHT}]}>
-      <Path
-        path={path}
+    <View style={styles.container}>
+      <LineChart
+        data={data}
+        width={width}
+        height={CANVAS_HEIGHT}
+        spacing={spacing}
+        initialSpacing={0}
+        endSpacing={0}
         color={color}
-        style="stroke"
-        strokeWidth={1.8}
-        strokeCap="round"
-        strokeJoin="round"
+        thickness={2}
+        hideDataPoints
+        hideYAxisText
+        hideAxesAndRules
+        yAxisOffset={-CANVAS_HEIGHT * 0.25}
+        maxValue={CANVAS_HEIGHT * 0.5}
+        mostNegativeValue={-CANVAS_HEIGHT * 0.25}
+        curved
+        curvature={0.15}
+        scrollToEnd
+        disableScroll
+        adjustToWidth
+        areaChart={false}
+        isAnimated={false}
+        animateOnDataChange={false}
+        backgroundColor={Colors.surface}
       />
-    </Canvas>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  canvas: {
-    backgroundColor: 'transparent',
+  container: {
+    backgroundColor: Colors.surface,
+    overflow: 'hidden',
   },
 });
