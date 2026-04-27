@@ -141,6 +141,10 @@ function applyDeterioration(state: SimulationState): void {
     deteriorateHypoxemia(vitals, t);
   } else if (scenarioId === 'hypotensive_shock') {
     deteriorateHypotensiveShock(vitals, t);
+  } else if (scenarioId === 'panic_attack') {
+    deterioratePanicAttack(vitals, t);
+  } else if (scenarioId === 'critical_hypoglycemia') {
+    deteriorateCriticalHypoglycemia(vitals, t);
   }
 }
 
@@ -215,6 +219,44 @@ function deteriorateHypotensiveShock(vitals: Vitals, t: ThresholdCounters): void
   }
 }
 
+// Scenario 4 — Panic Attack
+// Sympathetic surge pushes HR/BP upward; prolonged strain can cause desaturation.
+function deterioratePanicAttack(vitals: Vitals, t: ThresholdCounters): void {
+  vitals.hr += 2;
+  vitals.sbp += 1;
+
+  if (t.hrAbove140 >= 4) {
+    vitals.spo2 -= 1;
+  }
+
+  if (t.spo2Below90 >= 4) {
+    vitals.sbp -= 2;
+  }
+
+  if (t.hrAbove160 >= 6) {
+    vitals.rhythm = 'tachy';
+  }
+}
+
+// Scenario 5 — Critical Hypoglycemia
+// Falling glucose drives tachycardia and hypotension before oxygenation worsens.
+function deteriorateCriticalHypoglycemia(vitals: Vitals, t: ThresholdCounters): void {
+  vitals.hr += 2;
+  vitals.sbp -= 1.5;
+
+  if (t.sbpBelow80 >= 4) {
+    vitals.spo2 -= 0.5;
+  }
+
+  if (t.sbpBelow70 >= 4) {
+    vitals.hr += 2;
+  }
+
+  if (t.sbpBelow60 >= 6) {
+    vitals.rhythm = 'tachy';
+  }
+}
+
 // ─── Active Intervention Effects ──────────────────────────────────────────────
 
 function applyActiveInterventions(state: SimulationState): void {
@@ -237,6 +279,27 @@ function applyActiveInterventions(state: SimulationState): void {
     vitals.hr -= 5;
   }
 
+  // Guided Breathing — slow sympathetic surge and recover oxygenation.
+  if (interventions.guided_breathing.activeTicksRemaining > 0) {
+    vitals.hr -= 5;
+    vitals.sbp -= 2;
+    if (vitals.spo2 < 98) {
+      vitals.spo2 += 1;
+    }
+  }
+
+  // Glucose — reverse low-sugar stress response.
+  if (interventions.glucose.activeTicksRemaining > 0) {
+    vitals.hr -= 3;
+    vitals.sbp += 3;
+    if (vitals.spo2 < 97) {
+      vitals.spo2 += 0.5;
+    }
+    if (vitals.hr < 115) {
+      vitals.rhythm = 'sinus';
+    }
+  }
+
   // Cardioversion effect is instant and applied in applyIntervention — no per-tick effect
 }
 
@@ -256,7 +319,7 @@ export function applyIntervention(
   // Block if on cooldown
   if (current.cooldownRemaining > 0) return state;
 
-  const isEligible = definition.eligibleWhen(state.vitals);
+  const isEligible = definition.eligibleWhen(state.vitals, state.scenarioId);
 
   const next: SimulationState = {
     ...state,
@@ -311,6 +374,24 @@ function applyEligibleEffect(state: SimulationState, id: InterventionId): void {
     // Immediate SBP drop
     vitals.sbp -= 10;
   }
+
+  if (id === 'guided_breathing') {
+    vitals.hr -= 8;
+    vitals.sbp -= 6;
+    if (vitals.spo2 < 98) {
+      vitals.spo2 += 1;
+    }
+    vitals.rhythm = 'sinus';
+  }
+
+  if (id === 'glucose') {
+    vitals.hr -= 8;
+    vitals.sbp += 6;
+    if (vitals.spo2 < 97) {
+      vitals.spo2 += 1;
+    }
+    vitals.rhythm = 'sinus';
+  }
 }
 
 // Immediate penalties when intervention is misapplied (ineligible)
@@ -334,6 +415,15 @@ function applyIneligiblePenalty(state: SimulationState, id: InterventionId): voi
   }
 
   // Oxygen misapply (SpO2 already >=95) — no direct harm, just wasted cooldown
+
+  if (id === 'guided_breathing') {
+    vitals.sbp -= 2;
+  }
+
+  if (id === 'glucose') {
+    vitals.hr += 4;
+    vitals.sbp += 4;
+  }
 }
 
 // ─── Threshold Counters ────────────────────────────────────────────────────────

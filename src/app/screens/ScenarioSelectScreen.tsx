@@ -12,6 +12,8 @@ const ORDERED_SCENARIOS: ScenarioId[] = [
   'tachyarrhythmia',
   'hypoxemia',
   'hypotensive_shock',
+  'panic_attack',
+  'critical_hypoglycemia',
 ];
 
 function tierColor(tier: SeverityTier): string {

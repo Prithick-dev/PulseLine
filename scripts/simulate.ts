@@ -66,3 +66,13 @@ run('hypotensive_shock', 'CORRECT PATH', [
   {tick: 12, id: 'oxygen'},
   {tick: 24, id: 'iv_fluids'},
 ]);
+
+// Scenario 4: guided breathing early, oxygen only if saturation starts slipping
+run('panic_attack', 'CORRECT PATH', [
+  {tick: 2, id: 'guided_breathing'},
+]);
+
+// Scenario 5: glucose immediately
+run('critical_hypoglycemia', 'CORRECT PATH', [
+  {tick: 2, id: 'glucose'},
+]);

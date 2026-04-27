@@ -29,11 +29,15 @@ const INTERVENTION_CONFIG: Record<InterventionId, {label: string; icon: string}>
   iv_fluids:     {label: 'IV FLUIDS',   icon: '💉'},
   rate_control:  {label: 'RATE-CTRL',   icon: '🫀'},
   cardioversion: {label: 'CARDIOVERT',  icon: '⚡'},
+  guided_breathing: {label: 'GUIDED BREATH', icon: '🫁'},
+  glucose: {label: 'GLUCOSE', icon: '🧃'},
 };
 
 const INTERVENTION_ORDER: InterventionId[] = [
   'oxygen',
   'iv_fluids',
+  'guided_breathing',
+  'glucose',
   'rate_control',
   'cardioversion',
 ];
@@ -177,7 +181,7 @@ export function GameplayScreen({route, navigation}: Props) {
             const def = INTERVENTIONS[id];
             const ivState = interventions[id];
             const isAvailable = scenario.availableInterventions.includes(id);
-            const isEligible = def.eligibleWhen(vitals);
+            const isEligible = def.eligibleWhen(vitals, scenarioId);
 
             return (
               <ActionButton

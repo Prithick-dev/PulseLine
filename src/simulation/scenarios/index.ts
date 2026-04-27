@@ -1,8 +1,8 @@
 // Static scenario definitions — initial states from PHASE1_SIMULATION_SPEC.md section 7
 
-import {ScenarioDefinition} from '../types';
+import {ScenarioDefinition, ScenarioId} from '../types';
 
-export const SCENARIOS: Record<string, ScenarioDefinition> = {
+export const SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
   tachyarrhythmia: {
     id: 'tachyarrhythmia',
     name: 'TACHYARRHYTHMIA',
@@ -52,5 +52,39 @@ export const SCENARIOS: Record<string, ScenarioDefinition> = {
     timeLimitSeconds: 120,
     parTimeSeconds: 75,
     availableInterventions: ['oxygen', 'iv_fluids'],
+  },
+
+  panic_attack: {
+    id: 'panic_attack',
+    name: 'PANIC ATTACK',
+    description: 'Sympathetic surge. Breathing control is key.',
+    difficulty: 'warning',
+    initialVitals: {
+      hr: 138,
+      sbp: 164,
+      dbp: 92,
+      spo2: 97,
+      rhythm: 'sinus',
+    },
+    timeLimitSeconds: 100,
+    parTimeSeconds: 65,
+    availableInterventions: ['oxygen', 'guided_breathing', 'rate_control', 'cardioversion'],
+  },
+
+  critical_hypoglycemia: {
+    id: 'critical_hypoglycemia',
+    name: 'CRITICAL HYPOGLYCEMIA',
+    description: 'Sugar crash with collapse risk. Give glucose fast.',
+    difficulty: 'critical',
+    initialVitals: {
+      hr: 126,
+      sbp: 88,
+      dbp: 56,
+      spo2: 96,
+      rhythm: 'tachy',
+    },
+    timeLimitSeconds: 105,
+    parTimeSeconds: 70,
+    availableInterventions: ['oxygen', 'iv_fluids', 'glucose', 'rate_control'],
   },
 };

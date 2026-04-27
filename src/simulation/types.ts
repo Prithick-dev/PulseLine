@@ -5,9 +5,20 @@ export type RhythmState = 'sinus' | 'tachy' | 'vfib';
 
 export type SeverityTier = 'stable' | 'warning' | 'critical' | 'failing';
 
-export type ScenarioId = 'tachyarrhythmia' | 'hypoxemia' | 'hypotensive_shock';
+export type ScenarioId =
+  | 'tachyarrhythmia'
+  | 'hypoxemia'
+  | 'hypotensive_shock'
+  | 'panic_attack'
+  | 'critical_hypoglycemia';
 
-export type InterventionId = 'oxygen' | 'iv_fluids' | 'rate_control' | 'cardioversion';
+export type InterventionId =
+  | 'oxygen'
+  | 'iv_fluids'
+  | 'rate_control'
+  | 'cardioversion'
+  | 'guided_breathing'
+  | 'glucose';
 
 export type OutcomeType = 'stabilized' | 'patient_lost';
 
@@ -89,7 +100,7 @@ export interface InterventionDefinition {
   name: string;
   cooldownSeconds: number;
   effectDurationTicks: number;
-  eligibleWhen: (vitals: Vitals) => boolean;
+  eligibleWhen: (vitals: Vitals, scenarioId: ScenarioId) => boolean;
 }
 
 // Navigation param list — typed for react-navigation
